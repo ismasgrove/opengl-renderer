@@ -65,9 +65,9 @@ int main()
 	//Shader shader("shader.vert", "shader.frag");
 	Shader lightShader("light.vert", "light.frag");
 	Shader meshShader("mesh.vert", "mesh.frag");
-	Model miku("dancing-anime/source/Samba.fbx");
-	Model stormtrooper("dancing-stormtrooper/source/silly_dancing.fbx");
-	//Model backpack("backpack/backpack.obj");
+	Model miku("models/dancing-anime/source/Samba.fbx");
+	Model stormtrooper("models/dancing-stormtrooper/source/silly_dancing.fbx");
+	//Model backpack("/models/backpack/backpack.obj");
 
 	float vertices[] = {
 		// positions          // normals           // texture coords
@@ -170,7 +170,7 @@ int main()
 			0.032f // quadratic
 		},*/
 		{
-			glm::vec3(0.0f, 2.0f, -20.0f), // position
+			glm::vec3(0.0f, 2.0f, 3.0f), // position
 			glm::vec3(0.2f, 0.2f, 0.2f), // ambient
 			glm::vec3(0.7f, 0.7f, 0.7f), // diffuse
 			glm::vec3(1.0f, 1.0f, 1.0f), // specular
@@ -206,7 +206,7 @@ int main()
 	{
 		processInput(window);
 		//
-		glClearColor(0.01f, 0.01f, 0.01f, 1.0f);
+		glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		spotlight.position = camera.Position;
 		spotlight.direction = camera.Front;
@@ -224,7 +224,7 @@ int main()
 			model = glm::mat4(1.0f);
 			lightShader.setVec3("color", s.color);
 			model = glm::translate(model, s.position);
-			model = glm::scale(model, glm::vec3(10.0f));
+			model = glm::scale(model, glm::vec3(0.2f));
 			lightShader.setMat4("model", model);
 
 			glBindVertexArray(lightVAO);
@@ -257,9 +257,8 @@ int main()
 		model = glm::scale(model, glm::vec3(0.5f));
 		model = glm::translate(model, glm::vec3(-4.0f, 0.0f, 0.0f));
 		meshShader.setMat4("model", model);
-		//stormtrooper.Draw(meshShader);
+		stormtrooper.Draw(meshShader);
 		model = glm::translate(model, glm::vec3(-1.0f, 2.0f, 0.0f));
-		//backpack.Draw(meshShader);
 
 		glfwSwapBuffers(window);
 		glfwPollEvents();

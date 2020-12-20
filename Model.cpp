@@ -28,7 +28,7 @@ void Model::Draw(Shader& shader)
 		for (size_t i = 0; i < transforms.size(); i++)
 		{
 			std::string transform_entry = "bones[" + std::to_string(i) + ']';
-			std::cout << glm::to_string(transforms[i]) << std::endl;
+			//std::cout << glm::to_string(transforms[i]) << std::endl;
 			transforms[i] = glm::mat4(1.0f);
 			glUniformMatrix4fv(glGetUniformLocation(shader.ID, transform_entry.c_str()), 1, GL_TRUE, (float*)glm::value_ptr(transforms[i]));
 		}
