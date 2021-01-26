@@ -23,19 +23,6 @@ struct Texture
 	std::string path;
 };
 
-struct VertexBoneData
-{
-	unsigned int IDs[NUM_BONES_PER_VERTEX];
-	float Weights[NUM_BONES_PER_VERTEX];
-	void addBoneData(unsigned int id, float weight);
-};
-
-struct BoneInfo
-{
-	glm::mat4 boneOffset;
-	glm::mat4 finalTransformation;
-};
-
 struct Material
 {
 	glm::vec3 ambient, diffuse, specular;
@@ -48,14 +35,13 @@ public:
 	std::vector<Vertex> vertices;
 	std::vector<unsigned int> indices;
 	std::vector<Texture> textures;
-	std::vector<VertexBoneData> bones;
 	Material material;
 
-	Mesh(std::vector<Vertex> &vertices, std::vector<unsigned int> &indices, std::vector<Texture> &textures, std::vector<VertexBoneData> &bones, Material& material);
+	Mesh(std::vector<Vertex> &vertices, std::vector<unsigned int> &indices, std::vector<Texture> &textures, Material& material);
 	~Mesh();
 	void Draw(Shader& shader, bool textured);
 private:
-	unsigned int VAO, VBO, EBO, VBO_Bones;
+	unsigned int VAO, VBO, EBO;
 	void setupMesh();
 };
 

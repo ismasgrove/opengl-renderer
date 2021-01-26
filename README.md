@@ -2,6 +2,8 @@
 
 This is sort of a frankenstein project. A playground, I might say. It's a typical 'renderer from scratch' project that I would try to improve over time.
 
+![Renderer image](image.jpg?raw=true)
+
 Implemented:
 
 1. Lighting (point lights, spotlights and directional light)
@@ -19,3 +21,5 @@ Resources used:
 2. ogldev
 3. Various books
 4. Various forum posts from khronos and gamedev.net
+
+UPDATE: I will no longer work on this project. Instead, for my frankenstein playground project where I learn more and more graphics techniques, I will be moving on to Vulkan full time.

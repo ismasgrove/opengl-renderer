@@ -18,25 +18,9 @@ Model::~Model(){
 void Model::Draw(Shader& shader)
 {
 	if (animated)
-	{
 		shader.setBool("animated", true); // doesn't work yet
-		std::vector<glm::mat4> transforms;
-		auto runningTime = std::chrono::steady_clock::now() - start_time;
-		auto time = std::chrono::duration<double, std::milli>(runningTime).count() / 1000;
-		boneTransform((float)time, transforms);
 
-		for (size_t i = 0; i < transforms.size(); i++)
-		{
-			std::string transform_entry = "bones[" + std::to_string(i) + ']';
-			//std::cout << glm::to_string(transforms[i]) << std::endl;
-			transforms[i] = glm::mat4(1.0f);
-			glUniformMatrix4fv(glGetUniformLocation(shader.ID, transform_entry.c_str()), 1, GL_TRUE, (float*)glm::value_ptr(transforms[i]));
-		}
-	}
-	else {
-		shader.setBool("animated", false);
-	}
-	for (auto& m : meshes)
+		for (auto& m : meshes)
 		m.Draw(shader, textured);
 }
 
@@ -53,9 +37,7 @@ void Model::loadModel(std::string path)
 	directory = path.substr(0, path.find_last_of('/'));
 
 	if (scene->HasAnimations()) {
-		animated = true;
-		global_transform_inv = aiMatrix4x4ToGlm(&scene->mRootNode->mTransformation);
-		global_transform_inv = glm::inverse(global_transform_inv);
+		//
 	}
 
 	processNode(scene->mRootNode);
@@ -78,7 +60,6 @@ Mesh Model::processMesh(aiMesh* mesh)
 	std::vector<Vertex> vertices;
 	std::vector<unsigned int> indices;
 	std::vector<Texture> textures;
-	std::vector<VertexBoneData> bones;
 
 	Material mesh_material;
 
@@ -108,35 +89,6 @@ Mesh Model::processMesh(aiMesh* mesh)
 		vertices.push_back(vertex);
 	}
 
-	if (scene->HasAnimations()) {
-		bones.resize(mesh->mNumVertices);
-		for (size_t i = 0; i < mesh->mNumBones; i++)
-		{
-			unsigned int boneIndex = 0;
-			std::string boneName(mesh->mBones[i]->mName.data);
-
-			if (bone_mapping.find(boneName) == bone_mapping.end())
-			{
-				boneIndex = n_bones++;
-				BoneInfo bi;
-				bones_info.push_back(bi);
-			}
-			else {
-				boneIndex = bone_mapping[boneName];
-			}
-
-			bone_mapping[boneName] = boneIndex;
-			bones_info[boneIndex].boneOffset = aiMatrix4x4ToGlm(&mesh->mBones[i]->mOffsetMatrix);
-
-			for (unsigned int j = 0; j < mesh->mBones[i]->mNumWeights; j++)
-			{
-				unsigned int vertexID = mesh->mBones[i]->mWeights[j].mVertexId;
-				float weight = mesh->mBones[i]->mWeights[j].mWeight;
-				bones[vertexID].addBoneData(boneIndex, weight);
-			}
-		}
-	}
-
 	for (unsigned int i = 0; i < mesh->mNumFaces; i++)
 	{
 		auto face = std::make_unique<aiFace>(mesh->mFaces[i]);
@@ -154,185 +106,7 @@ Mesh Model::processMesh(aiMesh* mesh)
 		textures.insert(textures.end(), specularMaps.begin(), specularMaps.end());
 	}
 
-	return Mesh(vertices, indices, textures, bones, mesh_material);
-}
-
-void Model::boneTransform(float time_s, std::vector<glm::mat4>& transforms)
-{
-	glm::mat4 identity = glm::mat4(1.0f);
-
-	float ticks_per_second = scene->mAnimations[0]->mTicksPerSecond != 0 ?
-		scene->mAnimations[0]->mTicksPerSecond : 25.0f;
-
-	float time_ticks = time_s * ticks_per_second;
-
-	float anim_time = fmod(time_ticks, scene->mAnimations[0]->mDuration);
-
-	readNodeHeirarchy(anim_time, scene->mRootNode, identity);
-
-	transforms.resize(n_bones);
-	for (size_t i = 0; i < n_bones; i++)
-	{
-		transforms[i] = bones_info[i].finalTransformation;
-	}
-
-}
-void Model::readNodeHeirarchy(float anim_time, const aiNode* node, const glm::mat4& parent_trans)
-{
-	std::string nodeName(node->mName.data);
-	const aiAnimation* animation = scene->mAnimations[0];
-
-	glm::mat4 node_transform(aiMatrix4x4ToGlm(&node->mTransformation));
-
-	const aiNodeAnim* node_anim = findNodeAnim(animation, nodeName);
-
-	if (node_anim)
-	{
-		aiVector3D scaling;
-		interpolatedScal(scaling, anim_time, node_anim);
-		glm::mat4 scaling_mat(1.0f);
-		scaling_mat = glm::scale(scaling_mat, glm::vec3((float)scaling.x, (float)scaling.y, (float)scaling.z));
-
-		aiQuaternion rot_q;
-		interpolatedRot(rot_q, anim_time, node_anim);
-		aiMatrix3x3 quat_mat = rot_q.GetMatrix();
-		glm::mat4 rot_mat = aiMatrix3x3ToGlm(&quat_mat);
-
-		aiVector3D translation;
-		interpolatedPos(translation, anim_time, node_anim);
-		glm::mat4 transl_mat(1.0f);
-		transl_mat = glm::translate(transl_mat, glm::vec3((float)translation.x, (float)translation.y, (float)translation.z));
-
-		node_transform = transl_mat * rot_mat * scaling_mat;
-	}
-
-	glm::mat4 global_transform = parent_trans * node_transform;
-
-	if (bone_mapping.find(nodeName) != bone_mapping.end())
-	{
-		unsigned int boneIndex = bone_mapping[nodeName];
-		bones_info[boneIndex].finalTransformation = global_transform_inv * global_transform * bones_info[boneIndex].boneOffset;
-	}
-
-	for (size_t i = 0; i < node->mNumChildren; i++)
-	{
-		readNodeHeirarchy(anim_time, node->mChildren[i], global_transform);
-	}
-
-}
-void Model::interpolatedRot(aiQuaternion& out, float anim_time, const aiNodeAnim* node_anim)
-{
-	if (node_anim->mNumRotationKeys == 1)
-	{
-		out = node_anim->mRotationKeys[0].mValue;
-		return;
-	}
-
-	unsigned int rotIndex = findRot(anim_time, node_anim);
-	unsigned int nextRotIndex = (rotIndex + 1);
-	assert(nextRotIndex < node_anim->mNumRotationKeys);
-	float deltaTime = node_anim->mRotationKeys[nextRotIndex].mTime - node_anim->mRotationKeys[rotIndex].mTime;
-	float factor = (anim_time - (float)node_anim->mRotationKeys[rotIndex].mTime) / deltaTime;
-	assert(factor >= 0.0f && factor <= 1.0f);
-	const aiQuaternion& startQRot = node_anim->mRotationKeys[rotIndex].mValue;
-	const aiQuaternion& endQRot = node_anim->mRotationKeys[nextRotIndex].mValue;
-	aiQuaternion::Interpolate(out, startQRot, endQRot, factor);
-	out = out.Normalize();
-}
-void Model::interpolatedScal(aiVector3D& out, float anim_time, const aiNodeAnim* node_anim)
-{
-	if (node_anim->mNumScalingKeys == 1)
-	{
-		out = node_anim->mScalingKeys[0].mValue;
-		return;
-	}
-
-	unsigned int scalIndex = findScal(anim_time, node_anim);
-	unsigned int nextScalIndex = (scalIndex + 1);
-	assert(nextScalIndex < node_anim->mNumScalingKeys);
-	float deltaTime = node_anim->mScalingKeys[nextScalIndex].mTime - node_anim->mScalingKeys[scalIndex].mTime;
-	float factor = (anim_time - (float)node_anim->mScalingKeys[scalIndex].mTime) / deltaTime;
-	assert(factor >= 0.0f && factor <= 1.0f);
-
-	const aiVector3D& startQScal = node_anim->mScalingKeys[scalIndex].mValue;
-	const aiVector3D& endQScal = node_anim->mScalingKeys[nextScalIndex].mValue;
-	aiVector3D delta = endQScal - startQScal;
-	out = startQScal + factor * delta;
-}
-void Model::interpolatedPos(aiVector3D& out, float anim_time, const aiNodeAnim* node_anim)
-{
-	if (node_anim->mNumPositionKeys == 1)
-	{
-		out = node_anim->mPositionKeys[0].mValue;
-		return;
-	}
-
-	unsigned int posIndex = findPos(anim_time, node_anim);
-	unsigned int nextPosIndex = (posIndex + 1);
-	assert(nextPosIndex < node_anim->mNumPositionKeys);
-	float deltaTime = node_anim->mPositionKeys[nextPosIndex].mTime - node_anim->mPositionKeys[posIndex].mTime;
-	float factor = (anim_time - (float)node_anim->mPositionKeys[posIndex].mTime) / deltaTime;
-	assert(factor >= 0.0f && factor <= 1.0f);
-
-	const aiVector3D& startQPos = node_anim->mPositionKeys[posIndex].mValue;
-	const aiVector3D& endQPos = node_anim->mPositionKeys[nextPosIndex].mValue;
-	aiVector3D delta = endQPos - startQPos;
-	out = startQPos + factor * delta;
-}
-unsigned int Model::findRot(float anim_time, const aiNodeAnim* node_anim)
-{
-	assert(node_anim->mNumRotationKeys > 0);
-	for (size_t i = 0; i < node_anim->mNumRotationKeys - 1; i++)
-	{
-		if (anim_time < (float)node_anim->mRotationKeys[i + 1].mTime)
-		{
-			return i;
-		}
-	}
-
-	assert(0);
-}
-unsigned int Model::findScal(float anim_time, const aiNodeAnim* node_anim)
-{
-	assert(node_anim->mNumScalingKeys > 0);
-
-	for (size_t i = 0; i < node_anim->mNumScalingKeys - 1; i++)
-	{
-		if (anim_time < (float)node_anim->mScalingKeys[i + 1].mTime)
-		{
-			return i;
-		}
-	}
-
-	assert(0);
-}
-unsigned int Model::findPos(float anim_time, const aiNodeAnim* node_anim)
-{
-	assert(node_anim->mNumPositionKeys > 0);
-
-	for (size_t i = 0; i < node_anim->mNumPositionKeys - 1; i++)
-	{
-		if (anim_time < (float)node_anim->mPositionKeys[i + 1].mTime)
-		{
-			return i;
-		}
-	}
-
-	assert(0);
-}
-
-const aiNodeAnim* Model::findNodeAnim(const aiAnimation* anim, std::string nodeName)
-{
-	for (size_t i = 0; i < anim->mNumChannels; i++)
-	{
-		const aiNodeAnim* node_anim = anim->mChannels[i];
-		if (std::string(node_anim->mNodeName.data) == nodeName)
-		{
-			return node_anim;
-		}
-	}
-
-	return nullptr;
+	return Mesh(vertices, indices, textures, mesh_material);
 }
 
 Material Model::loadMaterial(aiMaterial* mat)
