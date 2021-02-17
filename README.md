@@ -22,4 +22,4 @@ Resources used:
 3. Various books
 4. Various forum posts from khronos and gamedev.net
 
-UPDATE: I will no longer work on this project. Instead, for my frankenstein playground project where I learn more and more graphics techniques, I will be moving on to Vulkan full time.
+UPDATE: I will no longer work on this project. Instead, for my frankenstein playground project where I learn more and more graphics techniques, I will be moving on to a newer API (either Vulkan or DirectX 12) as I anticipate to learn even more about graphic pipelines from them.
